@@ -1,0 +1,1025 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>KasRupawan — Pencatatan Keuangan</title>
+  <!-- PWA / App-like Mobile Meta Tags -->
+  <meta name="theme-color" content="#18181B" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="KasRupawan" />
+  <link id="pwaManifestLink" rel="manifest" />
+  <link id="appleTouchIconLink" rel="apple-touch-icon" />
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Chart.js untuk Grafik Laporan Bulanan -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Google Fonts: Plus Jakarta Sans (Clean & Modern) -->
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+          },
+          colors: {
+            dopa: {
+              bg: '#FAF9F6',       // Warm Alabaster Minimalist Base
+              card: '#FFFFFF',
+              lime: '#D9F99D',     // Electric Lime (Income / Positive)
+              limeDark: '#65A30D',
+              coral: '#FF6B6B',    // Vibrant Coral (Expense / Utang)
+              violet: '#8B5CF6',   // Vivid Violet (Target / Accent)
+              amber: '#FBBF24',    // Sunny Yellow (Highlight)
+              sky: '#38BDF8',      // Sky Blue (Piutang)
+              ink: '#18181B'       // Deep Charcoal
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body {
+      background-color: #F3F2EE;
+      color: #18181B;
+      -webkit-tap-highlight-color: transparent;
+    }
+    /* Hide scrollbar for clean mobile look */
+    ::-webkit-scrollbar {
+      width: 0px;
+      background: transparent;
+    }
+    .glass-nav {
+      background: rgba(255, 255, 255, 0.9);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+    }
+    .dopamine-shadow {
+      box-shadow: 0 8px 24px -6px rgba(24, 24, 27, 0.06);
+    }
+    .btn-pop:active {
+      transform: scale(0.96);
+    }
+  </style>
+</head>
+<body class="flex justify-center min-h-screen">
+
+  <!-- Mobile App Container -->
+  <div class="w-full max-w-md bg-dopa-bg min-h-screen relative flex flex-col shadow-2xl overflow-x-hidden pb-28">
+    
+    <!-- Top Header -->
+    <header class="px-5 pt-6 pb-4 flex items-center justify-between sticky top-0 z-30 bg-dopa-bg/90 backdrop-blur-md">
+      <div>
+        <div class="flex items-center gap-2">
+          <span class="w-3 h-3 rounded-full bg-dopa-violet inline-block animate-pulse"></span>
+          <span id="syncStatusText" class="text-xs font-semibold text-zinc-500">Mode Demo (Belum Konek Sheet)</span>
+        </div>
+        <h1 class="text-xl font-extrabold tracking-tight text-dopa-ink mt-0.5">KasRupawan ✨</h1>
+      </div>
+      <div class="flex items-center gap-2">
+        <button onclick="syncData()" id="btnRefresh" class="p-2.5 rounded-2xl bg-white border border-zinc-200/80 text-zinc-700 hover:bg-zinc-50 btn-pop transition" title="Sinkronkan Spreadsheet">
+          <svg id="refreshIcon" class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+        </button>
+        <button onclick="openModal('modalSettings')" class="p-2.5 rounded-2xl bg-dopa-ink text-white btn-pop transition" title="Koneksi Google Sheets">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Toast Notification (Pengganti alert) -->
+    <div id="toast" class="fixed top-20 left-1/2 -translate-x-1/2 z-50 hidden transition-all duration-300 w-[90%] max-w-sm">
+      <div id="toastContent" class="px-4 py-3 rounded-2xl bg-dopa-ink text-white text-sm font-medium shadow-xl flex items-center justify-between">
+        <span id="toastMsg">Pesan notifikasi</span>
+      </div>
+    </div>
+
+    <!-- MAIN CONTENT AREA -->
+    <main class="px-5 flex-1 space-y-6">
+
+      <!-- TAB 1: BERANDA / TRANSAKSI -->
+      <section id="tab-home" class="space-y-5">
+        <!-- Balance Hero Card -->
+        <div class="rounded-3xl p-6 bg-dopa-ink text-white relative overflow-hidden dopamine-shadow">
+          <!-- Decorative Dopamine Blobs -->
+          <div class="w-32 h-32 rounded-full bg-dopa-violet/30 blur-2xl absolute -top-10 -right-10"></div>
+          <div class="w-28 h-28 rounded-full bg-dopa-lime/20 blur-xl absolute -bottom-8 -left-8"></div>
+          
+          <p class="text-xs font-medium text-zinc-400 uppercase tracking-wider">Total Saldo Bersih</p>
+          <h2 id="totalBalance" class="text-3xl font-extrabold mt-1 tracking-tight">Rp 0</h2>
+          
+          <div class="grid grid-cols-2 gap-3 mt-5 pt-4 border-t border-zinc-800">
+            <div class="bg-zinc-900/80 p-3 rounded-2xl">
+              <div class="flex items-center gap-1.5 text-dopa-lime text-xs font-semibold">
+                <span class="w-2 h-2 rounded-full bg-dopa-lime"></span> Pemasukan
+              </div>
+              <p id="totalIncome" class="text-sm font-bold mt-1 text-white">Rp 0</p>
+            </div>
+            <div class="bg-zinc-900/80 p-3 rounded-2xl">
+              <div class="flex items-center gap-1.5 text-dopa-coral text-xs font-semibold">
+                <span class="w-2 h-2 rounded-full bg-dopa-coral"></span> Pengeluaran
+              </div>
+              <p id="totalExpense" class="text-sm font-bold mt-1 text-white">Rp 0</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Quick Action Pills -->
+        <div class="grid grid-cols-2 gap-3">
+          <button onclick="openTransactionModal('Pemasukan')" class="py-3.5 px-4 rounded-2xl bg-dopa-lime text-dopa-ink font-bold text-sm flex items-center justify-center gap-2 btn-pop transition shadow-sm">
+            <span class="text-lg">+</span> Pemasukan
+          </button>
+          <button onclick="openTransactionModal('Pengeluaran')" class="py-3.5 px-4 rounded-2xl bg-dopa-coral text-white font-bold text-sm flex items-center justify-center gap-2 btn-pop transition shadow-sm">
+            <span class="text-lg">-</span> Pengeluaran
+          </button>
+        </div>
+
+        <!-- Recent Transactions List -->
+        <div>
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="font-bold text-base text-dopa-ink">Riwayat Transaksi</h3>
+            <span id="txCountBadge" class="text-xs font-semibold px-2.5 py-1 rounded-full bg-zinc-200/70 text-zinc-600">0 item</span>
+          </div>
+          <div id="transactionList" class="space-y-2.5">
+            <!-- Diisi via JS -->
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 2: UTANG & PIUTANG -->
+      <section id="tab-debt" class="hidden space-y-5">
+        <div class="flex items-center justify-between">
+          <div>
+            <h2 class="text-xl font-extrabold text-dopa-ink">Utang & Piutang</h2>
+            <p class="text-xs text-zinc-500">Biar gak lupa nagih atau bayar</p>
+          </div>
+          <button onclick="openModal('modalDebt')" class="px-4 py-2.5 rounded-2xl bg-dopa-amber text-dopa-ink font-bold text-xs btn-pop shadow-sm">
+            + Catat Baru
+          </button>
+        </div>
+
+        <!-- Ringkasan Utang vs Piutang -->
+        <div class="grid grid-cols-2 gap-3">
+          <div class="p-4 rounded-3xl bg-white border border-zinc-100 dopamine-shadow">
+            <span class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-dopa-coral">Utang Saya</span>
+            <p id="summaryUtang" class="text-base font-extrabold text-dopa-ink mt-2">Rp 0</p>
+            <p class="text-[11px] text-zinc-400 mt-0.5">Belum lunas</p>
+          </div>
+          <div class="p-4 rounded-3xl bg-white border border-zinc-100 dopamine-shadow">
+            <span class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-sky-100 text-sky-600">Piutang (Teman)</span>
+            <p id="summaryPiutang" class="text-base font-extrabold text-dopa-ink mt-2">Rp 0</p>
+            <p class="text-[11px] text-zinc-400 mt-0.5">Belum dibayar</p>
+          </div>
+        </div>
+
+        <!-- Filter Utang/Piutang -->
+        <div class="flex gap-2 bg-zinc-200/60 p-1 rounded-2xl">
+          <button onclick="filterDebt('ALL')" id="filterDebtAll" class="flex-1 py-2 rounded-xl text-xs font-bold bg-white text-dopa-ink shadow-sm transition">Semua</button>
+          <button onclick="filterDebt('Utang')" id="filterDebtUtang" class="flex-1 py-2 rounded-xl text-xs font-bold text-zinc-500 transition">Utang</button>
+          <button onclick="filterDebt('Piutang')" id="filterDebtPiutang" class="flex-1 py-2 rounded-xl text-xs font-bold text-zinc-500 transition">Piutang</button>
+        </div>
+
+        <div id="debtList" class="space-y-3">
+          <!-- Diisi via JS -->
+        </div>
+      </section>
+
+      <!-- TAB 3: TABUNGAN TARGET -->
+      <section id="tab-goals" class="hidden space-y-5">
+        <div class="flex items-center justify-between">
+          <div>
+            <h2 class="text-xl font-extrabold text-dopa-ink">Tabungan Target 🎯</h2>
+            <p class="text-xs text-zinc-500">Wujudin wishlist satu per satu</p>
+          </div>
+          <button onclick="openModal('modalGoal')" class="px-4 py-2.5 rounded-2xl bg-dopa-violet text-white font-bold text-xs btn-pop shadow-sm">
+            + Target Baru
+          </button>
+        </div>
+
+        <div id="goalsList" class="space-y-3.5">
+          <!-- Diisi via JS -->
+        </div>
+      </section>
+
+      <!-- TAB 4: GRAFIK LAPORAN BULANAN -->
+      <section id="tab-report" class="hidden space-y-5">
+        <div class="flex items-center justify-between">
+          <div>
+            <h2 class="text-xl font-extrabold text-dopa-ink">Laporan Bulanan 📊</h2>
+            <p class="text-xs text-zinc-500">Analisis arus kas & kategori</p>
+          </div>
+          <input type="month" id="reportMonthPicker" onchange="renderCharts()" class="px-3 py-2 rounded-2xl bg-white border border-zinc-200 text-xs font-bold text-dopa-ink focus:outline-none">
+        </div>
+
+        <!-- Bar Chart Pemasukan vs Pengeluaran -->
+        <div class="p-5 rounded-3xl bg-white border border-zinc-100 dopamine-shadow">
+          <h3 class="text-sm font-bold text-dopa-ink mb-3">Arus Kas Bulan Ini</h3>
+          <div class="h-48 w-full">
+            <canvas id="cashflowChart"></canvas>
+          </div>
+        </div>
+
+        <!-- Doughnut Chart Kategori Pengeluaran -->
+        <div class="p-5 rounded-3xl bg-white border border-zinc-100 dopamine-shadow">
+          <h3 class="text-sm font-bold text-dopa-ink mb-3">Pengeluaran per Kategori</h3>
+          <div class="h-52 w-full flex justify-center">
+            <canvas id="categoryChart"></canvas>
+          </div>
+          <div id="categoryBreakdown" class="mt-4 space-y-2 border-t border-zinc-100 pt-3">
+            <!-- Breakdown list -->
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- BOTTOM NAVIGATION BAR (Mobile App Style) -->
+    <nav class="fixed bottom-4 left-1/2 -translate-x-1/2 w-[92%] max-w-[410px] glass-nav border border-zinc-200/80 rounded-3xl p-2 flex justify-around items-center shadow-xl z-40">
+      <button onclick="switchTab('home')" id="nav-home" class="nav-btn flex flex-col items-center py-2 px-3 rounded-2xl bg-dopa-ink text-white transition">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+        <span class="text-[10px] font-bold mt-1">Beranda</span>
+      </button>
+      <button onclick="switchTab('debt')" id="nav-debt" class="nav-btn flex flex-col items-center py-2 px-3 rounded-2xl text-zinc-500 hover:text-dopa-ink transition">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+        <span class="text-[10px] font-bold mt-1">Utang</span>
+      </button>
+      <button onclick="switchTab('goals')" id="nav-goals" class="nav-btn flex flex-col items-center py-2 px-3 rounded-2xl text-zinc-500 hover:text-dopa-ink transition">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+        <span class="text-[10px] font-bold mt-1">Target</span>
+      </button>
+      <button onclick="switchTab('report')" id="nav-report" class="nav-btn flex flex-col items-center py-2 px-3 rounded-2xl text-zinc-500 hover:text-dopa-ink transition">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z"/><path stroke-linecap="round" stroke-linejoin="round" d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z"/></svg>
+        <span class="text-[10px] font-bold mt-1">Grafik</span>
+      </button>
+    </nav>
+
+  </div>
+
+  <!-- ================= MODALS ================= -->
+
+  <!-- Modal 1: Koneksi Google Spreadsheet -->
+  <div id="modalSettings" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 hidden flex items-end sm:items-center justify-center p-4">
+    <div class="bg-white w-full max-w-md rounded-3xl p-6 space-y-4 animate-fade-in">
+      <div class="flex justify-between items-center">
+        <h3 class="text-lg font-extrabold text-dopa-ink">Konek Google Spreadsheet 🔗</h3>
+        <button onclick="closeModal('modalSettings')" class="p-2 rounded-full bg-zinc-100 text-zinc-500">✕</button>
+      </div>
+      <p class="text-xs text-zinc-500 leading-relaxed">
+        Paste <b>Web App URL</b> dari Google Apps Script yang udah lo deploy di Spreadsheet lo. Semua transaksi otomatis tersimpan ke Spreadsheet!
+      </p>
+      <div>
+        <label class="text-xs font-bold text-zinc-700 block mb-1.5">Google Apps Script Web App URL</label>
+        <input type="url" id="sheetUrlInput" placeholder="https://script.google.com/macros/s/..." class="w-full px-4 py-3 rounded-2xl bg-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-dopa-violet">
+      </div>
+      <div class="flex gap-2 pt-2">
+        <button onclick="saveSheetUrl()" class="flex-1 py-3.5 rounded-2xl bg-dopa-violet text-white font-bold text-sm btn-pop">Simpan & Sinkronkan</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal 2: Tambah Transaksi -->
+  <div id="modalTransaction" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 hidden flex items-end sm:items-center justify-center p-4">
+    <div class="bg-white w-full max-w-md rounded-3xl p-6 space-y-4">
+      <div class="flex justify-between items-center">
+        <h3 id="txModalTitle" class="text-lg font-extrabold text-dopa-ink">Catat Transaksi</h3>
+        <button onclick="closeModal('modalTransaction')" class="p-2 rounded-full bg-zinc-100 text-zinc-500">✕</button>
+      </div>
+      <form onsubmit="submitTransaction(event)" class="space-y-3.5">
+        <input type="hidden" id="txType" value="Pengeluaran">
+        <div>
+          <label class="text-xs font-bold text-zinc-600 block mb-1">Nominal (Rp)</label>
+          <input type="number" id="txAmount" required min="1" placeholder="50000" class="w-full px-4 py-3 rounded-2xl bg-zinc-100 text-lg font-extrabold focus:outline-none focus:ring-2 focus:ring-dopa-ink">
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="text-xs font-bold text-zinc-600 block mb-1">Kategori</label>
+            <select id="txCategory" class="w-full px-3 py-3 rounded-2xl bg-zinc-100 text-sm font-semibold focus:outline-none">
+              <!-- Diisi dinamis -->
+            </select>
+          </div>
+          <div>
+            <label class="text-xs font-bold text-zinc-600 block mb-1">Tanggal</label>
+            <input type="date" id="txDate" required class="w-full px-3 py-3 rounded-2xl bg-zinc-100 text-sm font-semibold focus:outline-none">
+          </div>
+        </div>
+        <div>
+          <label class="text-xs font-bold text-zinc-600 block mb-1">Catatan (Opsional)</label>
+          <input type="text" id="txNote" placeholder="Contoh: Kopi susu gula aren" class="w-full px-4 py-3 rounded-2xl bg-zinc-100 text-sm focus:outline-none">
+        </div>
+        <button type="submit" id="btnSubmitTx" class="w-full py-3.5 rounded-2xl bg-dopa-ink text-white font-bold text-sm btn-pop mt-2">Simpan Transaksi</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal 3: Tambah Utang / Piutang -->
+  <div id="modalDebt" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 hidden flex items-end sm:items-center justify-center p-4">
+    <div class="bg-white w-full max-w-md rounded-3xl p-6 space-y-4">
+      <div class="flex justify-between items-center">
+        <h3 class="text-lg font-extrabold text-dopa-ink">Catat Utang / Piutang</h3>
+        <button onclick="closeModal('modalDebt')" class="p-2 rounded-full bg-zinc-100 text-zinc-500">✕</button>
+      </div>
+      <form onsubmit="submitDebt(event)" class="space-y-3.5">
+        <div class="grid grid-cols-2 gap-2 bg-zinc-100 p-1.5 rounded-2xl">
+          <label class="cursor-pointer">
+            <input type="radio" name="debtType" value="Utang" checked class="peer hidden">
+            <div class="py-2 text-center rounded-xl text-xs font-bold text-zinc-500 peer-checked:bg-dopa-coral peer-checked:text-white transition">Saya Ngutang</div>
+          </label>
+          <label class="cursor-pointer">
+            <input type="radio" name="debtType" value="Piutang" class="peer hidden">
+            <div class="py-2 text-center rounded-xl text-xs font-bold text-zinc-500 peer-checked:bg-dopa-sky peer-checked:text-white transition">Teman Ngutang</div>
+          </label>
+        </div>
+        <div>
+          <label class="text-xs font-bold text-zinc-600 block mb-1">Nama Orang</label>
+          <input type="text" id="debtName" required placeholder="Contoh: Budi" class="w-full px-4 py-3 rounded-2xl bg-zinc-100 text-sm font-semibold focus:outline-none">
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="text-xs font-bold text-zinc-600 block mb-1">Nominal (Rp)</label>
+            <input type="number" id="debtAmount" required min="1" placeholder="100000" class="w-full px-3 py-3 rounded-2xl bg-zinc-100 text-sm font-extrabold focus:outline-none">
+          </div>
+          <div>
+            <label class="text-xs font-bold text-zinc-600 block mb-1">Jatuh Tempo</label>
+            <input type="date" id="debtDue" required class="w-full px-3 py-3 rounded-2xl bg-zinc-100 text-sm font-semibold focus:outline-none">
+          </div>
+        </div>
+        <div>
+          <label class="text-xs font-bold text-zinc-600 block mb-1">Keterangan</label>
+          <input type="text" id="debtNote" placeholder="Contoh: Talangin tiket konser" class="w-full px-4 py-3 rounded-2xl bg-zinc-100 text-sm focus:outline-none">
+        </div>
+        <button type="submit" class="w-full py-3.5 rounded-2xl bg-dopa-amber text-dopa-ink font-bold text-sm btn-pop">Simpan Catatan</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal 4: Tambah Tabungan Target -->
+  <div id="modalGoal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 hidden flex items-end sm:items-center justify-center p-4">
+    <div class="bg-white w-full max-w-md rounded-3xl p-6 space-y-4">
+      <div class="flex justify-between items-center">
+        <h3 class="text-lg font-extrabold text-dopa-ink">Buat Tabungan Target 🎯</h3>
+        <button onclick="closeModal('modalGoal')" class="p-2 rounded-full bg-zinc-100 text-zinc-500">✕</button>
+      </div>
+      <form onsubmit="submitGoal(event)" class="space-y-3.5">
+        <div class="flex gap-3">
+          <div class="w-20">
+            <label class="text-xs font-bold text-zinc-600 block mb-1">Ikon</label>
+            <select id="goalEmoji" class="w-full px-3 py-3 rounded-2xl bg-zinc-100 text-xl text-center focus:outline-none">
+              <option value="🎯">🎯</option>
+              <option value="📱">📱</option>
+              <option value="✈️">✈️</option>
+              <option value="🏍️">🏍️</option>
+              <option value="💻">💻</option>
+              <option value="💍">💍</option>
+              <option value="🚨">🚨</option>
+            </select>
+          </div>
+          <div class="flex-1">
+            <label class="text-xs font-bold text-zinc-600 block mb-1">Nama Target</label>
+            <input type="text" id="goalName" required placeholder="Contoh: Dana Darurat / iPhone" class="w-full px-4 py-3 rounded-2xl bg-zinc-100 text-sm font-semibold focus:outline-none">
+          </div>
+        </div>
+        <div>
+          <label class="text-xs font-bold text-zinc-600 block mb-1">Target Nominal (Rp)</label>
+          <input type="number" id="goalTarget" required min="1000" placeholder="5000000" class="w-full px-4 py-3 rounded-2xl bg-zinc-100 text-base font-extrabold focus:outline-none">
+        </div>
+        <div>
+          <label class="text-xs font-bold text-zinc-600 block mb-1">Saldo Awal (Opsional)</label>
+          <input type="number" id="goalInitial" min="0" value="0" class="w-full px-4 py-3 rounded-2xl bg-zinc-100 text-sm font-semibold focus:outline-none">
+        </div>
+        <button type="submit" class="w-full py-3.5 rounded-2xl bg-dopa-violet text-white font-bold text-sm btn-pop">Buat Target</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal 5: Topup Tabungan Target -->
+  <div id="modalTopup" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 hidden flex items-end sm:items-center justify-center p-4">
+    <div class="bg-white w-full max-w-md rounded-3xl p-6 space-y-4">
+      <div class="flex justify-between items-center">
+        <h3 id="topupTitle" class="text-lg font-extrabold text-dopa-ink">Nabung ke Target</h3>
+        <button onclick="closeModal('modalTopup')" class="p-2 rounded-full bg-zinc-100 text-zinc-500">✕</button>
+      </div>
+      <form onsubmit="submitTopup(event)" class="space-y-4">
+        <input type="hidden" id="topupGoalId">
+        <div>
+          <label class="text-xs font-bold text-zinc-600 block mb-1">Nominal Setoran (Rp)</label>
+          <input type="number" id="topupAmount" required min="1" placeholder="250000" class="w-full px-4 py-3 rounded-2xl bg-zinc-100 text-lg font-extrabold focus:outline-none focus:ring-2 focus:ring-dopa-violet">
+        </div>
+        <button type="submit" class="w-full py-3.5 rounded-2xl bg-dopa-lime text-dopa-ink font-extrabold text-sm btn-pop">Tambah Tabungan ✨</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ================= JAVASCRIPT LOGIC ================= -->
+  <script>
+    // Setup PWA Manifest & App Icon secara dinamis (tanpa butuh file tambahan)
+    (function initPwaAssets() {
+      const svgIcon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192"><rect width="192" height="192" rx="44" fill="#18181B"/><circle cx="152" cy="36" r="28" fill="#8B5CF6"/><circle cx="38" cy="156" r="24" fill="#D9F99D"/><text x="96" y="116" text-anchor="middle" font-size="78">✨</text></svg>`;
+      const iconDataUrl = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgIcon);
+      document.getElementById('appleTouchIconLink').href = iconDataUrl;
+
+      const manifest = {
+        name: 'KasRupawan — Pencatatan Keuangan',
+        short_name: 'KasRupawan',
+        start_url: './',
+        display: 'standalone',
+        background_color: '#FAF9F6',
+        theme_color: '#18181B',
+        icons: [{ src: iconDataUrl, sizes: '192x192 512x512', type: 'image/svg+xml', purpose: 'any maskable' }]
+      };
+      const blob = new Blob([JSON.stringify(manifest)], { type: 'application/json' });
+      const manifestUrl = URL.createObjectURL(blob);
+      document.getElementById('pwaManifestLink').href = manifestUrl;
+    })();
+
+    // URL Web App Google Apps Script yang ditanam langsung agar langsung auto-sync
+    const DEFAULT_SHEET_URL = 'https://script.google.com/macros/s/AKfycbx5ExpZ2RqMbbF2wODTj5GqvIX9zdodbPVVSjSsk73PYlVXS43wgXzSh0Zdl1tN-ldKlQ/exec';
+
+    // State Aplikasi
+    let appState = {
+      sheetUrl: localStorage.getItem('dopacash_sheet_url') || DEFAULT_SHEET_URL,
+      transaksi: [],
+      utangPiutang: [],
+      tabunganTarget: [],
+      debtFilter: 'ALL'
+    };
+
+    let cashflowChartInstance = null;
+    let categoryChartInstance = null;
+
+    const CATEGORIES = {
+      Pemasukan: ['Gaji', 'Bonus', 'Freelance', 'Investasi', 'Lainnya'],
+      Pengeluaran: ['Makan & Minum', 'Transportasi', 'Belanja', 'Tagihan & Kos', 'Hiburan', 'Kesehatan', 'Lainnya']
+    };
+
+    const CATEGORY_EMOJIS = {
+      'Gaji': '💼', 'Bonus': '🎉', 'Freelance': '💻', 'Investasi': '📈',
+      'Makan & Minum': '🍜', 'Transportasi': '🛵', 'Belanja': '🛍️',
+      'Tagihan & Kos': '⚡', 'Hiburan': '🎮', 'Kesehatan': '💊', 'Lainnya': '✨'
+    };
+
+    // Inisialisasi Awal
+    window.addEventListener('DOMContentLoaded', () => {
+      const now = new Date();
+      const yyyy = now.getFullYear();
+      const mm = String(now.getMonth() + 1).padStart(2, '0');
+      document.getElementById('reportMonthPicker').value = `${yyyy}-${mm}`;
+      document.getElementById('txDate').valueAsDate = now;
+      document.getElementById('debtDue').valueAsDate = now;
+
+      if (appState.sheetUrl) {
+        localStorage.setItem('dopacash_sheet_url', appState.sheetUrl);
+        document.getElementById('sheetUrlInput').value = appState.sheetUrl;
+        syncData();
+      } else {
+        loadDemoData();
+      }
+
+      // Auto-sync otomatis saat pengguna kembali ke tab/aplikasi
+      document.addEventListener('visibilitychange', () => {
+        if (!document.hidden && appState.sheetUrl) {
+          syncData();
+        }
+      });
+    });
+
+    // Data Demo jika belum konek ke Google Sheets
+    function loadDemoData() {
+      const today = new Date().toISOString().split('T')[0];
+      appState.transaksi = [
+        { ID: '1', Tanggal: today, Tipe: 'Pemasukan', Kategori: 'Gaji', Nominal: 6500000, Catatan: 'Gaji Bulanan' },
+        { ID: '2', Tanggal: today, Tipe: 'Pengeluaran', Kategori: 'Makan & Minum', Nominal: 45000, Catatan: 'Kopi & Makan Siang' },
+        { ID: '3', Tanggal: today, Tipe: 'Pengeluaran', Kategori: 'Transportasi', Nominal: 25000, Catatan: 'Bensin & Parkir' }
+      ];
+      appState.utangPiutang = [
+        { ID: '101', Tipe: 'Piutang', Nama: 'Raka', Nominal: 150000, JatuhTempo: today, Status: 'Belum Lunas', Catatan: 'Patungan makan' },
+        { ID: '102', Tipe: 'Utang', Nama: 'Dina', Nominal: 50000, JatuhTempo: today, Status: 'Belum Lunas', Catatan: 'Titip beli pulsa' }
+      ];
+      appState.tabunganTarget = [
+        { ID: '201', NamaTarget: 'Dana Darurat', TargetNominal: 10000000, Terkumpul: 3500000, Emoji: '🚨' },
+        { ID: '202', NamaTarget: 'Liburan Bali', TargetNominal: 4000000, Terkumpul: 1200000, Emoji: '✈️' }
+      ];
+      updateSyncBadge(false);
+      renderAll();
+    }
+
+    function updateSyncBadge(isConnected) {
+      const badge = document.getElementById('syncStatusText');
+      if (isConnected) {
+        badge.textContent = 'Terkoneksi ke Google Sheets';
+        badge.className = 'text-xs font-semibold text-dopa-limeDark';
+      } else {
+        badge.textContent = 'Mode Demo (Klik ikon rantai di kanan)';
+        badge.className = 'text-xs font-semibold text-zinc-500';
+      }
+    }
+
+    function saveSheetUrl() {
+      const url = document.getElementById('sheetUrlInput').value.trim();
+      if (!url) {
+        showToast('URL tidak boleh kosong!');
+        return;
+      }
+      appState.sheetUrl = url;
+      localStorage.setItem('dopacash_sheet_url', url);
+      closeModal('modalSettings');
+      syncData();
+    }
+
+    function formatRp(num) {
+      return 'Rp ' + Number(num || 0).toLocaleString('id-ID');
+    }
+
+    let toastTimeout = null;
+    function showToast(msg) {
+      const toast = document.getElementById('toast');
+      document.getElementById('toastMsg').textContent = msg;
+      toast.classList.remove('hidden');
+      clearTimeout(toastTimeout);
+      toastTimeout = setTimeout(() => {
+        toast.classList.add('hidden');
+      }, 2800);
+    }
+
+    function fetchFromSheetJsonp(url) {
+      return new Promise((resolve, reject) => {
+        const callbackName = 'dopacash_cb_' + Date.now() + '_' + Math.floor(Math.random() * 10000);
+        const script = document.createElement('script');
+        const timeoutId = setTimeout(() => {
+          cleanup();
+          reject(new Error('Timeout saat menghubungi Google Apps Script'));
+        }, 12000);
+
+        function cleanup() {
+          clearTimeout(timeoutId);
+          delete window[callbackName];
+          if (script.parentNode) script.parentNode.removeChild(script);
+        }
+
+        window[callbackName] = function(data) {
+          cleanup();
+          resolve(data);
+        };
+
+        script.onerror = function() {
+          cleanup();
+          reject(new Error('Gagal memuat script dari URL Apps Script'));
+        };
+
+        const sep = url.includes('?') ? '&' : '?';
+        script.src = `${url}${sep}callback=${callbackName}`;
+        document.body.appendChild(script);
+      });
+    }
+
+    async function syncData() {
+      if (!appState.sheetUrl) {
+        showToast('Masukkan URL Google Apps Script dulu ya!');
+        openModal('modalSettings');
+        return;
+      }
+
+      const icon = document.getElementById('refreshIcon');
+      icon.classList.add('animate-spin');
+      showToast('Menyinkronkan data...');
+
+      try {
+        let data;
+        try {
+          data = await fetchFromSheetJsonp(appState.sheetUrl);
+        } catch (jsonpErr) {
+          const res = await fetch(appState.sheetUrl, { method: 'GET', redirect: 'follow' });
+          data = await res.json();
+        }
+
+        if (data && data.status === 'success') {
+          appState.transaksi = (data.transaksi || []).reverse();
+          appState.utangPiutang = (data.utangPiutang || []).reverse();
+          appState.tabunganTarget = data.tabunganTarget || [];
+          updateSyncBadge(true);
+          renderAll();
+          showToast('Data berhasil disinkronkan! ✨');
+        } else {
+          showToast('Error Sheet: ' + ((data && data.message) || 'Cek deployment & izin Anyone'));
+        }
+      } catch (err) {
+        console.error(err);
+        showToast('Gagal konek: Pastikan URL berakhiran /exec & Who has access: Anyone.');
+      } finally {
+        icon.classList.remove('animate-spin');
+      }
+    }
+
+    async function postToSheet(payload) {
+      if (!appState.sheetUrl) return;
+      try {
+        await fetch(appState.sheetUrl, {
+          method: 'POST',
+          mode: 'no-cors',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+      } catch (err) {
+        console.error('Error posting to sheet:', err);
+        showToast('Gagal mengirim ke Spreadsheet');
+      }
+    }
+
+    function switchTab(tabName) {
+      ['home', 'debt', 'goals', 'report'].forEach(t => {
+        document.getElementById(`tab-${t}`).classList.add('hidden');
+        const btn = document.getElementById(`nav-${t}`);
+        btn.classList.remove('bg-dopa-ink', 'text-white');
+        btn.classList.add('text-zinc-500');
+      });
+
+      document.getElementById(`tab-${tabName}`).classList.remove('hidden');
+      const activeBtn = document.getElementById(`nav-${tabName}`);
+      activeBtn.classList.add('bg-dopa-ink', 'text-white');
+      activeBtn.classList.remove('text-zinc-500');
+
+      if (tabName === 'report') {
+        renderCharts();
+      }
+    }
+
+    function openModal(id) {
+      document.getElementById(id).classList.remove('hidden');
+    }
+    function closeModal(id) {
+      document.getElementById(id).classList.add('hidden');
+    }
+
+    function openTransactionModal(type) {
+      document.getElementById('txType').value = type;
+      document.getElementById('txModalTitle').textContent = type === 'Pemasukan' ? 'Catat Pemasukan 💰' : 'Catat Pengeluaran 💸';
+      const catSelect = document.getElementById('txCategory');
+      catSelect.innerHTML = CATEGORIES[type].map(c => `<option value="${c}">${CATEGORY_EMOJIS[c] || ''} ${c}</option>`).join('');
+      openModal('modalTransaction');
+    }
+
+    async function submitTransaction(e) {
+      e.preventDefault();
+      const newTx = {
+        id: Date.now().toString(),
+        tanggal: document.getElementById('txDate').value,
+        tipe: document.getElementById('txType').value,
+        kategori: document.getElementById('txCategory').value,
+        nominal: Number(document.getElementById('txAmount').value),
+        catatan: document.getElementById('txNote').value || '-'
+      };
+
+      appState.transaksi.unshift({
+        ID: newTx.id, Tanggal: newTx.tanggal, Tipe: newTx.tipe,
+        Kategori: newTx.kategori, Nominal: newTx.nominal, Catatan: newTx.catatan
+      });
+      renderAll();
+      closeModal('modalTransaction');
+      e.target.reset();
+      document.getElementById('txDate').valueAsDate = new Date();
+      showToast('Transaksi dicatat! ✨');
+
+      await postToSheet({ action: 'ADD_TRANSACTION', data: newTx });
+    }
+
+    async function deleteTransaction(id) {
+      appState.transaksi = appState.transaksi.filter(t => String(t.ID) !== String(id));
+      renderAll();
+      showToast('Transaksi dihapus');
+      await postToSheet({ action: 'DELETE_TRANSACTION', id: id });
+    }
+
+    async function submitDebt(e) {
+      e.preventDefault();
+      const tipe = document.querySelector('input[name="debtType"]:checked').value;
+      const newDebt = {
+        id: Date.now().toString(),
+        tipe: tipe,
+        nama: document.getElementById('debtName').value,
+        nominal: Number(document.getElementById('debtAmount').value),
+        jatuhTempo: document.getElementById('debtDue').value,
+        catatan: document.getElementById('debtNote').value || '-'
+      };
+
+      appState.utangPiutang.unshift({
+        ID: newDebt.id, Tipe: newDebt.tipe, Nama: newDebt.nama,
+        Nominal: newDebt.nominal, JatuhTempo: newDebt.jatuhTempo,
+        Status: 'Belum Lunas', Catatan: newDebt.catatan
+      });
+      renderAll();
+      closeModal('modalDebt');
+      e.target.reset();
+      showToast('Catatan utang/piutang disimpan!');
+
+      await postToSheet({ action: 'ADD_DEBT', data: newDebt });
+    }
+
+    async function toggleDebtStatus(id) {
+      const item = appState.utangPiutang.find(d => String(d.ID) === String(id));
+      if (item) {
+        item.Status = item.Status === 'Lunas' ? 'Belum Lunas' : 'Lunas';
+        renderAll();
+        showToast(`Status diubah: ${item.Status}`);
+        await postToSheet({ action: 'TOGGLE_DEBT_STATUS', id: id });
+      }
+    }
+
+    function filterDebt(type) {
+      appState.debtFilter = type;
+      ['ALL', 'Utang', 'Piutang'].forEach(f => {
+        const btn = document.getElementById(`filterDebt${f === 'ALL' ? 'All' : f}`);
+        if (f === type) {
+          btn.className = 'flex-1 py-2 rounded-xl text-xs font-bold bg-white text-dopa-ink shadow-sm transition';
+        } else {
+          btn.className = 'flex-1 py-2 rounded-xl text-xs font-bold text-zinc-500 transition';
+        }
+      });
+      renderDebts();
+    }
+
+    async function submitGoal(e) {
+      e.preventDefault();
+      const newGoal = {
+        id: Date.now().toString(),
+        namaTarget: document.getElementById('goalName').value,
+        targetNominal: Number(document.getElementById('goalTarget').value),
+        terkumpul: Number(document.getElementById('goalInitial').value || 0),
+        emoji: document.getElementById('goalEmoji').value
+      };
+
+      appState.tabunganTarget.push({
+        ID: newGoal.id, NamaTarget: newGoal.namaTarget,
+        TargetNominal: newGoal.targetNominal, Terkumpul: newGoal.terkumpul, Emoji: newGoal.emoji
+      });
+      renderAll();
+      closeModal('modalGoal');
+      e.target.reset();
+      showToast('Target tabungan dibuat! 🎯');
+
+      await postToSheet({ action: 'ADD_GOAL', data: newGoal });
+    }
+
+    function openTopupModal(id, name) {
+      document.getElementById('topupGoalId').value = id;
+      document.getElementById('topupTitle').textContent = `Nabung: ${name}`;
+      openModal('modalTopup');
+    }
+
+    async function submitTopup(e) {
+      e.preventDefault();
+      const id = document.getElementById('topupGoalId').value;
+      const amount = Number(document.getElementById('topupAmount').value);
+      
+      const goal = appState.tabunganTarget.find(g => String(g.ID) === String(id));
+      if (goal) {
+        goal.Terkumpul = Number(goal.Terkumpul) + amount;
+        renderAll();
+        closeModal('modalTopup');
+        e.target.reset();
+        showToast(`Berhasil nabung ${formatRp(amount)}! 🚀`);
+        await postToSheet({ action: 'TOPUP_GOAL', id: id, amount: amount });
+      }
+    }
+
+    function renderAll() {
+      renderTransactions();
+      renderDebts();
+      renderGoals();
+    }
+
+    function renderTransactions() {
+      let income = 0;
+      let expense = 0;
+
+      appState.transaksi.forEach(t => {
+        const nom = Number(t.Nominal) || 0;
+        if (t.Tipe === 'Pemasukan') income += nom;
+        else expense += nom;
+      });
+
+      document.getElementById('totalIncome').textContent = formatRp(income);
+      document.getElementById('totalExpense').textContent = formatRp(expense);
+      document.getElementById('totalBalance').textContent = formatRp(income - expense);
+      document.getElementById('txCountBadge').textContent = `${appState.transaksi.length} item`;
+
+      const listEl = document.getElementById('transactionList');
+      if (appState.transaksi.length === 0) {
+        listEl.innerHTML = `<div class="text-center py-8 text-xs text-zinc-400 bg-white rounded-3xl border border-dashed border-zinc-200">Belum ada transaksi. Yuk mulai catat!</div>`;
+        return;
+      }
+
+      listEl.innerHTML = appState.transaksi.slice(0, 25).map(t => {
+        const isInc = t.Tipe === 'Pemasukan';
+        const emoji = CATEGORY_EMOJIS[t.Kategori] || '💸';
+        const dateStr = String(t.Tanggal).split('T')[0];
+        return `
+          <div class="p-3.5 rounded-2xl bg-white border border-zinc-100 flex items-center justify-between dopamine-shadow">
+            <div class="flex items-center gap-3">
+              <div class="w-11 h-11 rounded-2xl ${isInc ? 'bg-dopa-lime/40' : 'bg-red-50'} flex items-center justify-center text-xl">
+                ${emoji}
+              </div>
+              <div>
+                <p class="text-sm font-bold text-dopa-ink">${t.Kategori}</p>
+                <p class="text-[11px] text-zinc-400">${t.Catatan} • ${dateStr}</p>
+              </div>
+            </div>
+            <div class="text-right flex items-center gap-2">
+              <div>
+                <p class="text-sm font-extrabold ${isInc ? 'text-dopa-limeDark' : 'text-dopa-coral'}">
+                  ${isInc ? '+' : '-'}${formatRp(t.Nominal)}
+                </p>
+              </div>
+              <button onclick="deleteTransaction('${t.ID}')" class="text-zinc-300 hover:text-red-500 p-1 text-xs" title="Hapus">✕</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderDebts() {
+      let totalUtang = 0;
+      let totalPiutang = 0;
+
+      appState.utangPiutang.forEach(d => {
+        if (d.Status !== 'Lunas') {
+          if (d.Tipe === 'Utang') totalUtang += Number(d.Nominal) || 0;
+          else totalPiutang += Number(d.Nominal) || 0;
+        }
+      });
+
+      document.getElementById('summaryUtang').textContent = formatRp(totalUtang);
+      document.getElementById('summaryPiutang').textContent = formatRp(totalPiutang);
+
+      const filtered = appState.utangPiutang.filter(d => appState.debtFilter === 'ALL' || d.Tipe === appState.debtFilter);
+      const listEl = document.getElementById('debtList');
+
+      if (filtered.length === 0) {
+        listEl.innerHTML = `<div class="text-center py-8 text-xs text-zinc-400 bg-white rounded-3xl border border-dashed border-zinc-200">Catatan kosong. Aman terkendali!</div>`;
+        return;
+      }
+
+      listEl.innerHTML = filtered.map(d => {
+        const isUtang = d.Tipe === 'Utang';
+        const isLunas = d.Status === 'Lunas';
+        const dueStr = String(d.JatuhTempo).split('T')[0];
+
+        return `
+          <div class="p-4 rounded-3xl bg-white border ${isLunas ? 'border-zinc-100 opacity-60' : 'border-zinc-100'} dopamine-shadow flex items-center justify-between">
+            <div class="space-y-1">
+              <div class="flex items-center gap-2">
+                <span class="text-[10px] font-extrabold px-2 py-0.5 rounded-full ${isUtang ? 'bg-red-100 text-dopa-coral' : 'bg-sky-100 text-sky-600'}">
+                  ${d.Tipe}
+                </span>
+                <span class="text-sm font-bold text-dopa-ink ${isLunas ? 'line-through' : ''}">${d.Nama}</span>
+              </div>
+              <p class="text-base font-extrabold text-dopa-ink">${formatRp(d.Nominal)}</p>
+              <p class="text-[11px] text-zinc-400">${d.Catatan} • Tempo: ${dueStr}</p>
+            </div>
+            <button onclick="toggleDebtStatus('${d.ID}')" class="px-3.5 py-2 rounded-2xl text-xs font-bold btn-pop transition ${isLunas ? 'bg-dopa-lime text-dopa-ink' : 'bg-zinc-100 text-zinc-600 hover:bg-dopa-ink hover:text-white'}">
+              ${isLunas ? '✓ Lunas' : 'Tandai Lunas'}
+            </button>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderGoals() {
+      const listEl = document.getElementById('goalsList');
+      if (appState.tabunganTarget.length === 0) {
+        listEl.innerHTML = `<div class="text-center py-8 text-xs text-zinc-400 bg-white rounded-3xl border border-dashed border-zinc-200">Belum ada target tabungan. Buat target pertamamu!</div>`;
+        return;
+      }
+
+      listEl.innerHTML = appState.tabunganTarget.map(g => {
+        const terkumpul = Number(g.Terkumpul) || 0;
+        const target = Number(g.TargetNominal) || 1;
+        const pct = Math.min(100, Math.round((terkumpul / target) * 100));
+
+        return `
+          <div class="p-5 rounded-3xl bg-white border border-zinc-100 dopamine-shadow space-y-3">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-3">
+                <div class="w-12 h-12 rounded-2xl bg-violet-100 flex items-center justify-center text-2xl">
+                  ${g.Emoji || '🎯'}
+                </div>
+                <div>
+                  <h4 class="font-extrabold text-sm text-dopa-ink">${g.NamaTarget}</h4>
+                  <p class="text-xs text-zinc-400">Target: ${formatRp(target)}</p>
+                </div>
+              </div>
+              <button onclick="openTopupModal('${g.ID}', '${g.NamaTarget}')" class="px-3.5 py-2 rounded-2xl bg-dopa-lime text-dopa-ink font-extrabold text-xs btn-pop">
+                + Nabung
+              </button>
+            </div>
+
+            <div>
+              <div class="flex justify-between text-xs font-bold mb-1.5">
+                <span class="text-dopa-violet">${formatRp(terkumpul)}</span>
+                <span class="text-zinc-500">${pct}%</span>
+              </div>
+              <div class="w-full h-3 bg-zinc-100 rounded-full overflow-hidden">
+                <div class="h-full bg-gradient-to-r from-dopa-violet to-fuchsia-500 rounded-full transition-all duration-500" style="width: ${pct}%"></div>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderCharts() {
+      const selectedMonth = document.getElementById('reportMonthPicker').value;
+      const monthlyTx = appState.transaksi.filter(t => String(t.Tanggal).startsWith(selectedMonth));
+
+      let inc = 0;
+      let exp = 0;
+      const catTotals = {};
+
+      monthlyTx.forEach(t => {
+        const nom = Number(t.Nominal) || 0;
+        if (t.Tipe === 'Pemasukan') {
+          inc += nom;
+        } else {
+          exp += nom;
+          catTotals[t.Kategori] = (catTotals[t.Kategori] || 0) + nom;
+        }
+      });
+
+      const ctx1 = document.getElementById('cashflowChart').getContext('2d');
+      if (cashflowChartInstance) cashflowChartInstance.destroy();
+
+      cashflowChartInstance = new Chart(ctx1, {
+        type: 'bar',
+        data: {
+          labels: ['Pemasukan', 'Pengeluaran'],
+          datasets: [{
+            data: [inc, exp],
+            backgroundColor: ['#D9F99D', '#FF6B6B'],
+            borderRadius: 14,
+            barThickness: 48
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            y: { beginAtZero: true, grid: { color: '#F4F4F5' }, ticks: { font: { size: 10 } } },
+            x: { grid: { display: false }, ticks: { font: { weight: 'bold', size: 12 } } }
+          }
+        }
+      });
+
+      const ctx2 = document.getElementById('categoryChart').getContext('2d');
+      if (categoryChartInstance) categoryChartInstance.destroy();
+
+      const catLabels = Object.keys(catTotals);
+      const catValues = Object.values(catTotals);
+      const dopaColors = ['#8B5CF6', '#FF6B6B', '#FBBF24', '#38BDF8', '#A3E635', '#F472B6', '#FB923C'];
+
+      categoryChartInstance = new Chart(ctx2, {
+        type: 'doughnut',
+        data: {
+          labels: catLabels.length ? catLabels : ['Belum ada data'],
+          datasets: [{
+            data: catValues.length ? catValues : [1],
+            backgroundColor: catValues.length ? dopaColors : ['#E4E4E7'],
+            borderWidth: 0
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          cutout: '68%',
+          plugins: { legend: { display: false } }
+        }
+      });
+
+      const breakdownEl = document.getElementById('categoryBreakdown');
+      if (catLabels.length === 0) {
+        breakdownEl.innerHTML = `<p class="text-xs text-center text-zinc-400">Belum ada pengeluaran di bulan ini.</p>`;
+      } else {
+        breakdownEl.innerHTML = catLabels.map((cat, idx) => {
+          const color = dopaColors[idx % dopaColors.length];
+          return `
+            <div class="flex items-center justify-between text-xs">
+              <div class="flex items-center gap-2">
+                <span class="w-3 h-3 rounded-full" style="background:${color}"></span>
+                <span class="font-semibold text-zinc-700">${cat}</span>
+              </div>
+              <span class="font-bold text-dopa-ink">${formatRp(catValues[idx])}</span>
+            </div>
+          `;
+        }).join('');
+      }
+    }
+  </script>
+</body>
+</html>
